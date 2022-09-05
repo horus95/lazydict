@@ -1,15 +1,16 @@
-from collections import MutableMapping
+from collections.abc import MutableMapping
 from threading import RLock
 from inspect import getargspec
 from copy import copy
 
+
 def get_version():
-    VERSION = (     # SEMANTIC
-        1,          # major
-        0,          # minor
-        0,          # patch
-        'beta.2',   # pre-release
-        None        # build metadata
+    VERSION = (  # SEMANTIC
+        1,  # major
+        0,  # minor
+        0,  # patch
+        "beta.2",  # pre-release
+        None,  # build metadata
     )
 
     version = "%i.%i.%i" % (VERSION[0], VERSION[1], VERSION[2])
@@ -19,16 +20,21 @@ def get_version():
         version += "+%s" % VERSION[4]
     return version
 
-CONSTANT = frozenset(['evaluating', 'evaluated', 'error'])
+
+CONSTANT = frozenset(["evaluating", "evaluated", "error"])
+
 
 class LazyDictionaryError(Exception):
     pass
 
+
 class CircularReferenceError(LazyDictionaryError):
     pass
 
+
 class ConstantRedefinitionError(LazyDictionaryError):
     pass
+
 
 class LazyDictionary(MutableMapping):
     def __init__(self, values={}):
@@ -36,7 +42,7 @@ class LazyDictionary(MutableMapping):
         self.values = copy(values)
         self.states = {}
         for key in self.values:
-            self.states[key] = 'defined'
+            self.states[key] = "defined"
 
     def __len__(self):
         return len(self.values)
@@ -47,31 +53,33 @@ class LazyDictionary(MutableMapping):
     def __getitem__(self, key):
         with self.lock:
             if key in self.states:
-                if self.states[key] == 'evaluating':
-                    raise CircularReferenceError('value of "%s" depends on itself' % key)
-                elif self.states[key] == 'error':
+                if self.states[key] == "evaluating":
+                    raise CircularReferenceError(
+                        'value of "%s" depends on itself' % key
+                    )
+                elif self.states[key] == "error":
                     raise self.values[key]
-                elif self.states[key] == 'defined':
+                elif self.states[key] == "defined":
                     value = self.values[key]
                     if callable(value):
                         args, _, _, _ = getargspec(value)
                         if len(args) == 0:
-                            self.states[key] = 'evaluating'
+                            self.states[key] = "evaluating"
                             try:
                                 self.values[key] = value()
                             except Exception as ex:
                                 self.values[key] = ex
-                                self.states[key] = 'error'
+                                self.states[key] = "error"
                                 raise ex
                         elif len(args) == 1:
-                            self.states[key] = 'evaluating'
+                            self.states[key] = "evaluating"
                             try:
                                 self.values[key] = value(self)
                             except Exception as ex:
                                 self.values[key] = ex
-                                self.states[key] = 'error'
+                                self.states[key] = "error"
                                 raise ex
-                    self.states[key] = 'evaluated'
+                    self.states[key] = "evaluated"
             return self.values[key]
 
     def __contains__(self, key):
@@ -82,7 +90,7 @@ class LazyDictionary(MutableMapping):
             if self.states.get(key) in CONSTANT:
                 raise ConstantRedefinitionError('"%s" is immutable' % key)
             self.values[key] = value
-            self.states[key] = 'defined'
+            self.states[key] = "defined"
 
     def __delitem__(self, key):
         with self.lock:
@@ -97,11 +105,12 @@ class LazyDictionary(MutableMapping):
     def __repr__(self):
         return "LazyDictionary({0})".format(repr(self.values))
 
+
 class MutableLazyDictionary(LazyDictionary):
     def __setitem__(self, key, value):
         with self.lock:
             self.values[key] = value
-            self.states[key] = 'defined'
+            self.states[key] = "defined"
 
     def __delitem__(self, key):
         with self.lock:
